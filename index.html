@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Monster Buster 360 AR - เกมยิงมอนสเตอร์รอบทิศทาง</title>
+  
+  <!-- A-Frame Library for 3D/VR/AR -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      user-select: none;
+      background-color: #000;
+    }
+
+    /* Game HUD Overlay */
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-sizing: border-box;
+      padding: 20px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .score-board, .timer-board {
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #00ffff;
+      box-shadow: 0 0 15px #00ffff;
+      border-radius: 12px;
+      padding: 10px 20px;
+      color: #fff;
+      font-size: 20px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Start / End Screen Overlay */
+    #start-screen, #game-over-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      font-size: 36px;
+      margin-bottom: 10px;
+      color: #00ffff;
+      text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff;
+    }
+
+    p {
+      font-size: 16px;
+      color: #ddd;
+      max-width: 80%;
+      margin-bottom: 30px;
+      line-height: 1.5;
+    }
+
+    .btn {
+      pointer-events: auto;
+      padding: 15px 40px;
+      font-size: 22px;
+      font-weight: bold;
+      color: #000;
+      background: linear-gradient(45deg, #00ffff, #ff00ff);
+      border: none;
+      border-radius: 30px;
+      box-shadow: 0 0 20px #ff00ff;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Target Reticle in Center */
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 30px;
+      height: 30px;
+      margin-left: -15px;
+      margin-top: -15px;
+      border: 2px solid #00ffff;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 11;
+      box-shadow: 0 0 10px #00ffff;
+    }
+
+    #crosshair::after {
+      content: '';
+      position: absolute;
+      top: 13px;
+      left: 13px;
+      width: 4px;
+      height: 4px;
+      background: #ff00ff;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Game UI HUD -->
+  <div id="hud">
+    <div class="top-bar">
+      <div class="score-board">Score: <span id="score">0</span></div>
+      <div class="timer-board">Time: <span id="timer">30</span>s</div>
+    </div>
+  </div>
+
+  <div id="crosshair"></div>
+
+  <!-- Start Screen -->
+  <div id="start-screen">
+    <h1>MONSTER BUSTER 360</h1>
+    <p>หมุนหน้าจอโทรศัพท์หรือใช้เมาส์ลากรอบๆ 360 องศา<br>เพื่อค้นหาและยิงมอนสเตอร์สีสันสดใสในอวกาศ!</p>
+    <button class="btn" onclick="startGame()">เริ่มเล่นเกม</button>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="game-over-screen" style="display: none;">
+    <h1>GAME OVER</h1>
+    <p>คะแนนรวมของคุณ: <br><span id="final-score" style="font-size: 40px; color: #00ffff; font-weight: bold;">0</span> คะแนน</p>
+    <button class="btn" onclick="restartGame()">เล่นอีกครั้ง</button>
+  </div>
+
+  <!-- A-Frame 3D Scene with Black Background -->
+  <a-scene embedded vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: true">
+    
+    <!-- Set Background to Pure Black -->
+    <a-sky color="#000000"></a-sky>
+
+    <!-- Camera setup supporting Gyroscope Orientation & Mouse Dragging -->
+    <a-entity camera look-controls="magicWindowTrackingEnabled: true; touchEnabled: true; mouseEnabled: true" 
+              raycaster="objects: .clickable" 
+              cursor="rayOrigin: mouse">
+    </a-entity>
+
+    <!-- Ambient & Directional Lighting for Visual Effects -->
+    <a-ambient-light color="#ffffff" intensity="0.6"></a-ambient-light>
+    <a-directional-light position="2 4 3" intensity="1.2" color="#00ffff"></a-directional-light>
+    <a-directional-light position="-2 -4 -3" intensity="0.8" color="#ff00ff"></a-directional-light>
+
+    <!-- Container for Spawning Monsters & Particles -->
+    <a-entity id="monster-container"></a-entity>
+
+  </a-scene>
+
+  <script>
+    let score = 0;
+    let timeLeft = 30;
+    let gameInterval = null;
+    let monsterSpawnInterval = null;
+    let isPlaying = false;
+
+    // Web Audio Synthesizer for SFX
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playLaserSound() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(900, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.12);
+    }
+
+    function playExplosionSound() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.25);
+      gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.25);
+    }
+
+    // Start Game
+    function startGame() {
+      // Request Motion Permission on iOS Device
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission().catch(console.error);
+      }
+
+      document.getElementById('start-screen').style.display = 'none';
+      document.getElementById('game-over-screen').style.display = 'none';
+      
+      score = 0;
+      timeLeft = 30;
+      isPlaying = true;
+      document.getElementById('score').innerText = score;
+      document.getElementById('timer').innerText = timeLeft;
+
+      const container = document.getElementById('monster-container');
+      container.innerHTML = '';
+
+      gameInterval = setInterval(() => {
+        timeLeft--;
+        document.getElementById('timer').innerText = timeLeft;
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+
+      monsterSpawnInterval = setInterval(() => {
+        if (isPlaying) spawnMonster();
+      }, 800);
+
+      spawnMonster();
+    }
+
+    // Spawn 3D Monsters around Player in 360 Space
+    function spawnMonster() {
+      const container = document.getElementById('monster-container');
+
+      // Random position 360 degrees around camera
+      const theta = Math.random() * Math.PI * 2; 
+      const phi = (Math.random() - 0.5) * Math.PI * 0.6; 
+      const radius = 3 + Math.random() * 2; 
+
+      const x = radius * Math.cos(phi) * Math.sin(theta);
+      const y = radius * Math.sin(phi);
+      const z = -radius * Math.cos(phi) * Math.cos(theta);
+
+      const types = ['octahedron', 'torusKnot', 'dodecahedron', 'icosahedron'];
+      const colors = ['#ff0055', '#00ffff', '#ffcc00', '#9900ff', '#00ff66'];
+      
+      const randomType = types[Math.floor(Math.random() * types.length)];
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      const points = randomType === 'torusKnot' ? 25 : 10;
+
+      const monster = document.createElement('a-entity');
+      monster.setAttribute('class', 'clickable');
+      monster.setAttribute('position', `${x} ${y} ${z}`);
+      monster.setAttribute('geometry', `primitive: ${randomType}; radius: 0.4`);
+      monster.setAttribute('material', `color: ${randomColor}; roughness: 0.1; metalness: 0.9; wireframe: false`);
+      
+      // Spawn & Floating Animations
+      monster.setAttribute('animation__spawn', `property: scale; from: 0 0 0; to: 1 1 1; dur: 300; easing: easeOutBack`);
+      monster.setAttribute('animation__rotate', `property: rotation; to: 360 360 0; loop: true; dur: 2500; easing: linear`);
+
+      // Click Event
+      monster.addEventListener('click', () => {
+        if (!isPlaying) return;
+        
+        playLaserSound();
+        playExplosionSound();
+        if (navigator.vibrate) navigator.vibrate(60);
+
+        score += points;
+        document.getElementById('score').innerText = score;
+
+        // Visual Explosion FX
+        createExplosionFX(monster.getAttribute('position'), randomColor);
+
+        // Remove Monster
+        if (monster.parentNode) monster.parentNode.removeChild(monster);
+      });
+
+      // Auto-remove after time
+      setTimeout(() => {
+        if (monster.parentNode) monster.parentNode.removeChild(monster);
+      }, 3500);
+
+      container.appendChild(monster);
+    }
+
+    // Explosion Particles Effect
+    function createExplosionFX(pos, color) {
+      const container = document.getElementById('monster-container');
+      const count = 15;
+
+      for (let i = 0; i < count; i++) {
+        const particle = document.createElement('a-entity');
+        particle.setAttribute('position', pos);
+        particle.setAttribute('geometry', 'primitive: sphere; radius: 0.06');
+        particle.setAttribute('material', `color: ${color}; shader: flat`);
+
+        const dx = (Math.random() - 0.5) * 2;
+        const dy = (Math.random() - 0.5) * 2;
+        const dz = (Math.random() - 0.5) * 2;
+
+        particle.setAttribute('animation__fly', `property: position; to: ${pos.x + dx} ${pos.y + dy} ${pos.z + dz}; dur: 450; easing: easeOutQuad`);
+        particle.setAttribute('animation__fade', `property: scale; to: 0 0 0; dur: 450; easing: easeOutQuad`);
+
+        container.appendChild(particle);
+
+        setTimeout(() => {
+          if (particle.parentNode) particle.parentNode.removeChild(particle);
+        }, 450);
+      }
+    }
+
+    // End Game
+    function endGame() {
+      isPlaying = false;
+      clearInterval(gameInterval);
+      clearInterval(monsterSpawnInterval);
+
+      document.getElementById('final-score').innerText = score;
+      document.getElementById('game-over-screen').style.display = 'flex';
+    }
+
+    function restartGame() {
+      startGame();
+    }
+  </script>
+</body>
+</html>
